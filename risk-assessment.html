@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INDUS AI Risk Guard</title>
+    <style>
+        :root {
+            --brand-teal: #00BFA5;
+            --dark-bg: #121212;
+            --card-bg: #1e1e1e;
+            --text-main: #e0e0e0;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--dark-bg); color: var(--text-main); margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: auto; }
+        .header { text-align: center; border-bottom: 2px solid var(--brand-teal); padding-bottom: 20px; margin-bottom: 30px; }
+        .input-group { background: var(--card-bg); padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        textarea, input { width: 100%; background: #333; border: 1px solid #444; color: white; padding: 12px; border-radius: 4px; margin-top: 10px; box-sizing: border-box; }
+        button { background: var(--brand-teal); color: black; font-weight: bold; border: none; padding: 15px 30px; border-radius: 5px; cursor: pointer; margin-top: 15px; width: 100%; }
+        .report-table { width: 100%; border-collapse: collapse; margin-top: 30px; background: white; color: black; display: none; }
+        .report-table th, .report-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        .report-table th { background: #f4f4f4; }
+        .risk-badge { padding: 5px 10px; border-radius: 4px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>INDUS Occupational Health & Safety</h1>
+        <p>AI Risk Assessment Generator</p>
+    </div>
+
+    <div class="input-group">
+        <label>Enter API Key:</label>
+        <input type="password" id="apiKey" placeholder="Paste your Gemini Key here...">
+        
+        <label style="display:block; margin-top:20px;">Task Description:</label>
+        <textarea id="taskInput" rows="3" placeholder="e.g. Working on a scaffold during heavy wind..."></textarea>
+        
+        <button onclick="generateAssessment()">Analyze Hazards & Generate Report</button>
+    </div>
+
+    <div id="loading" style="display:none; text-align:center;">Analyzing site safety parameters...</div>
+
+    <table id="resultTable" class="report-table">
+        <thead>
+            <tr>
+                <th>Hazard</th>
+                <th>Who is at Risk?</th>
+                <th>Initial Risk (LxS)</th>
+                <th>Proposed Controls</th>
+                <th>Residual Risk</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+</div>
+
+<script>
+    async function generateAssessment() {
+        const key = document.getElementById('apiKey').value;
+        const task = document.getElementById('taskInput').value;
+        const loader = document.getElementById('loading');
+        const table = document.getElementById('resultTable');
+        
+        if(!key || !task) { alert("Fill all fields"); return; }
+
+        loader.style.display = 'block';
+        table.style.display = 'none';
+
+        const prompt = `Act as an IOSH Safety Consultant. Create a professional risk assessment for the task: "${task}". 
+        Return ONLY a JSON array of objects with keys: "hazard", "who", "initialRisk", "controls", "residualRisk". 
+        Include 5x5 matrix logic for risk scores.`;
+
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            });
+
+            const data = await response.json();
+            const text = data.candidates[0].content.parts[0].text.replace(/```json|```/g, "");
+            const assessments = JSON.parse(text);
+
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = "";
+            assessments.forEach(item => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${item.hazard}</td>
+                        <td>${item.who}</td>
+                        <td><strong>${item.initialRisk}</strong></td>
+                        <td>${item.controls}</td>
+                        <td><strong>${item.residualRisk}</strong></td>
+                    </tr>`;
+            });
+
+            loader.style.display = 'none';
+            table.style.display = 'table';
+        } catch (e) {
+            alert("Error generating report. Check key or connection.");
+            loader.style.display = 'none';
+        }
+    }
+</script>
+
+</body>
+</html>
